@@ -16,7 +16,7 @@ bd.dat.psad <- bd.dat
 coordinates(bd.dat.psad) <- ~ Longitude + Latitude
 proj4string(bd.dat.psad) <- CRS("+init=epsg:4326")
 
-bd.dat.psad <- spTransform(bd.dat.psad, CRS(proj4string(env.r)))
+bd.dat.psad <- spTransform(bd.dat.psad, CRS(proj4string(lst)))
 
 # Fitting glm model
 lst.dat <- data.frame(extract(lst, bd.dat.psad))
@@ -54,8 +54,6 @@ summary(m2.ndvi)
 plot(m2.ndvi)
 anova(m2.ndvi)
 
-anova(m2.ndvi, m2.lst)
-
 # ndvi and lst
 
 joint.reg <- cbind(bd.dat[, c("N.sampled", "N.positive")], lst.dat, ndvi.dat)
@@ -69,8 +67,6 @@ m1.joint <-  glm(cbind(N.positive, N.sampled - N.positive) ~ LST.PCA.1 +
            family = binomial)
 m2.joint <- step(m1.joint)
 summary(m2.joint)
-
-formula(m2.lst)
 
 # ndvi, lst, topo
 all.reg <- cbind(bd.dat[, c("N.sampled", "N.positive")], lst.dat, ndvi.dat, topo.dat)
@@ -89,11 +85,36 @@ m1.all <- glm(cbind(N.positive, N.sampled - N.positive) ~ LST.PCA.1 +
 m2.all <- step(m1.all)
 
 summary(m2.all)
-anova(m2.all)
+anova(m2.all, m2.lst)
 plot(m2.all)
 
 anova(m2.all, m2.lst)
 AIC(m2.all, m2.lst)
+
+#All interactions with NDVI
+m1.ints <- glm(cbind(N.positive, N.sampled - N.positive) ~ NDVI.PCA.1 * (LST.PCA.1 + 
+                  LST.PCA.3 + 
+                  LST.PCA.4 +
+                  Topo.PCA.2 + Topo.PCA.3 + Topo.PCA.4 +
+                  I(LST.PCA.1^2) +
+                  I(LST.PCA.5^2) +
+                  I(Topo.PCA.2^2) + I(Topo.PCA.3^2) + I(Topo.PCA.4^2)) +
+                  I(NDVI.PCA.1^2),
+              all.reg,
+              family = binomial)
+
+m2.ints <- step(m1.ints)
+summary(m2.ints)
+
+m3.ints <- update(m2.ints, .~. - LST.PCA.4)
+summary(m3.ints)
+
+m4.ints <- update(m3.ints, .~. - LST.PCA.3)
+summary(m4.ints)
+
+
+m5.ints <- update(m4.ints, .~. -I(Topo.PCA.2^2))
+summary(m5.ints)
 
 # Fitting variogram
 library(geoR)
@@ -114,25 +135,25 @@ vari.fit
 # Fitting geostatistical model
 library(PrevMap)
 
-m.fin <- glm(cbind(N.positive, N.sampled - N.positive) ~ LST.PCA.1 + LST.PCA.3 + 
+m.fin <- glm(cbind(N.positive, N.sampled - N.positive) ~ NDVI.PCA.1 : LST.PCA.1 + LST.PCA.1 +  
                   I(LST.PCA.1^2) + I(LST.PCA.5^2) + 
                   I(Topo.PCA.3^2) + I(Topo.PCA.4^2), 
              all.reg,
              family = binomial)
 
-par0.1 <- c(coef(m.fin),vari.fit$cov.pars,vari.fit$nugget)     #c(beta,sigma2,phi,tau2)
+params <- c(coef(m.fin),vari.fit$cov.pars,vari.fit$nugget)     #c(beta,sigma2,phi,tau2)
 
 data <- cbind(xy, all.reg)
 mcmc.1 <- control.mcmc.MCML(n.sim=50000,burnin=5000,thin=45,h=(1.65)/(nrow(data)^(1/6)))
 
-start.1 <- c(par0.1[10],par0.1[9]/par0.1[8])     #starting values of phi and the relative variance of the nugget effect nu2 respectively
+start.1 <- c(params[length(params)],params[length(params) - 1]/params[length(params)-1])     #starting values of phi and the relative variance of the nugget effect nu2 respectively
 
 # Fitting geo-statistical model
-fit.MCML.1 <- binomial.logistic.MCML(formula=N.positive ~ LST.PCA.1 + LST.PCA.3 + 
+fit.MCML.1 <- binomial.logistic.MCML(formula=N.positive ~  NDVI.PCA.1 : LST.PCA.1 + LST.PCA.1 +  
                                          I(LST.PCA.1^2) + I(LST.PCA.5^2) + 
                                          I(Topo.PCA.3^2) + I(Topo.PCA.4^2),
                                      units.m=~ N.sampled,
-                                     par0= par0.1,
+                                     par0= params,
                                      coords=~Longitude+ Latitude,
                                      data=data,
                                      control.mcmc=mcmc.1,
@@ -173,5 +194,5 @@ proj4string(exceed) <- CRS(proj4string(lst))
 dir.create("Prevalence-maps")
 
 #writing up results
-writeRaster(prevalence, "Prevalence-maps/Prevalence-median", "GTiff")
-for(i in 1:3)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "50" , "975")[i]), "GTiff")
+writeRaster(prevalence, "Prevalence-maps/Prevalence-median-m2", "GTiff")
+for(i in 1:3)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "50" , "975")[i], "-m2"), "GTiff")
