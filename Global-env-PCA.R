@@ -8,7 +8,7 @@ rp <- dismo::randomPoints(chelsa, 10000)
 samples <- na.omit(data.frame(extract(chelsa, rp)))
 pca <- princomp(samples)
 
-saveRDS(pca, "Environment-raster/Chela-PCA-resulds.rds")
+saveRDS(pca, "Environment-raster/Chelsa-PCA-results.rds")
 
 chels.pca <- predict(chelsa, pca, index = 1:10)
 
