@@ -12,7 +12,7 @@ chels.pca <- stack(list.files("../../Chelsa/PCA", "tif", full.names = T))
 
 peru <- readOGR("../Admin-layers/PER_adm0.shp")
 
-ref.r <- raster("Environment-raster/LST/LST-PCA-1.tif")
+ref.r <- raster("Prevalence-maps/Prevalence-median-m2.tif")
 
 chels.peru <- crop(chels.pca, extent(peru))
 chels.peru <- projectRaster(chels.peru, ref.r)
@@ -84,4 +84,4 @@ best.suits.s <- stack(best.suits)
 ## Harmonic weighted mean
 w.model <- 1/(weighted.mean(1/best.suits.s, exp(best.10)))
 
-writeRaster(w.model, "Bd-Suitability/DNC-weighted-mean", "GTiff")
+writeRaster(w.model, "Bd-Suitability/DNC-weighted-mean", "GTiff", overwrite = T)

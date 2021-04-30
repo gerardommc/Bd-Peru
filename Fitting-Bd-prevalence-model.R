@@ -181,7 +181,7 @@ pred.MCML <- spatial.pred.binomial.MCML(fit.MCML.1,
                                         scale.predictions="prevalence",
                                         standard.errors=TRUE,
                                         scale.thresholds="prevalence",
-                                        thresholds = c(0.025, 0.5, 0.975))
+                                        thresholds = c(0.025, 0.19, 0.5, 0.69, 0.975))
 
 plot(pred.MCML, type = "prevalence")
 
@@ -194,5 +194,5 @@ proj4string(exceed) <- CRS(proj4string(lst))
 dir.create("Prevalence-maps")
 
 #writing up results
-writeRaster(prevalence, "Prevalence-maps/Prevalence-median-m2", "GTiff")
-for(i in 1:3)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "50" , "975")[i], "-m2"), "GTiff")
+writeRaster(prevalence, "Prevalence-maps/Prevalence-median", "GTiff")
+for(i in 1:5)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "19", "50" , "69", "975")[i]), "GTiff")
