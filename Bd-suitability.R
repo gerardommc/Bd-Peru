@@ -1,27 +1,31 @@
-library(raster)
+library(terra)
 library(ntbox)
-library(rgdal)
 library(foreach)
+library(tidyr)
 
 # Occurrence data
 bd.per <- read.csv("BD-occurrence/Peru/Bd-prevalence-data.csv")
 
 bd.glob <- read.csv("BD-occurrence/Global/Bd-global-data.csv")
 
-chels.pca <- stack(list.files("../../Chelsa/PCA", "tif", full.names = T))
+chels.pca <- rast(list.files("../Chelsa/PCA", "tif", full.names = T))
 
-peru <- readOGR("../Admin-layers/PER_adm0.shp")
+peru <- vect("Admin-layers/gadm41_PER.gpkg")
 
-ref.r <- raster("Prevalence-maps/Prevalence-median-m2.tif")
+ref.r <- rast("Prevalence-maps/Prevalence-median-GeoStat.tif")
+crs(ref.r) <- crs("EPSG:24892")
 
-chels.peru <- crop(chels.pca, extent(peru))
-chels.peru <- projectRaster(chels.peru, ref.r)
-chels.peru <- raster::mask(chels.peru, ref.r)
+chels.peru <- crop(chels.pca, peru)
+
+chels.peru <- project(chels.peru, crs(ref.r))
+chels.peru <- resample(chels.peru, ref.r)
+chels.peru <- mask(chels.peru, ref.r)
 
 # Fitting ellipsoid
 bd.glob.pres <- subset(bd.glob, SppDet > 0, Country != "Peru")
 
-env.bd.glob <- na.omit(data.frame(extract(chels.pca, bd.glob.pres[, c("longitude", "latitude")])))
+env.bd.glob <- terra::extract(chels.pca, bd.glob.pres[, c("longitude", "latitude")]) |> as.data.frame() |> na.omit()
+env.bd.glob <- env.bd.glob[, -1]
 
 combs <- combn(1:10, m = 4)
 
@@ -32,11 +36,16 @@ centres <- foreach(i = 1:ncol(combs)) %do% {
 dir.create("Bd-Suitability")
 saveRDS(centres, "Bd-Suitability/Centres-covariances.rds")
 
-ellip <- foreach(i = seq_along(centres), .combine = c) %do% {
-    lay <- dropLayer(chels.peru, i = which(!names(chels.peru) %in% names(env.bd.glob)[combs[, i]]))
+library(raster)
+
+chels.peru1 <- stack(chels.peru)
+
+ellip <- foreach(j = seq_along(centres), .combine = c) %do% {
+    lay <- dropLayer(chels.peru1, 
+                             i = which(!names(chels.peru1) %in% names(env.bd.glob)[combs[, j]]))
     fit <- ellipsoidfit(envlayers = lay, 
-                      centroid = centres[[i]]$centroid,
-                      covar = centres[[i]]$covariance,
+                      centroid = centres[[j]]$centroid,
+                      covar = centres[[j]]$covariance,
                       level = 0.95,
                       size = 1, plot = F)
     return(fit$suitRaster)
@@ -45,18 +54,20 @@ ellip <- foreach(i = seq_along(centres), .combine = c) %do% {
 bd.pres <- subset(bd.per, N.positive > 0)
 coordinates(bd.pres) <- ~ Longitude + Latitude
 proj4string(bd.pres) <- CRS("+init=epsg:4326")
-bd.pres <- spTransform(bd.pres, CRSobj = CRS(proj4string(chels.peru)))
+bd.pres <- spTransform(bd.pres, CRSobj = CRS(proj4string(chels.peru1)))
 
-roc.tests <- lapply(ellip,
-                     function(x){
-                                pROC(continuous_mod = x,
-                                     test_data = coordinates(bd.pres),
-                                     n_iter = 1000,
-                                     E_percent = 5,
-                                     boost_percent = 50,
-                                     parallel = F,
-                                     rseed = 63193)
-                         })
+library(doParallel)
+registerDoParallel(cores = 24)
+
+roc.tests <- foreach(i = seq_along(ellip)) %dopar% {
+    pROC(continuous_mod = ellip[[i]],
+         test_data = coordinates(bd.pres),
+         n_iter = 10000,
+         E_percent = 5,
+         boost_percent = 50,
+         parallel = F,
+         rseed = 63193)
+}
 
 roc.results <- foreach(i = seq_along(roc.tests), .combine = rbind) %do%{
     roc.tests[[i]]$pROC_summary
