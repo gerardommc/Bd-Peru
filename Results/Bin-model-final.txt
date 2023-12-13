@@ -1,0 +1,38 @@
+
+Call:
+glm(formula = cbind(N.positive, N.sampled - N.positive) ~ NDVI.PCA.1 + 
+    LST.PCA.1 + LST.PCA.3 + Topo.PCA.3 + Topo.PCA.4 + I(LST.PCA.1^2) + 
+    I(Topo.PCA.2^2) + I(Topo.PCA.3^2) + I(NDVI.PCA.1^2) + NDVI.PCA.1:LST.PCA.1 + 
+    NDVI.PCA.1:LST.PCA.3 + NDVI.PCA.1:Topo.PCA.3 + NDVI.PCA.1:I(LST.PCA.1^2) + 
+    NDVI.PCA.1:I(Topo.PCA.2^2) + NDVI.PCA.1:I(Topo.PCA.3^2), 
+    family = binomial, data = all.reg)
+
+Coefficients:
+                           Estimate Std. Error z value Pr(>|z|)    
+(Intercept)                 -8.7417     1.2788  -6.836 8.14e-12 ***
+NDVI.PCA.1                  10.3681     2.0299   5.108 3.26e-07 ***
+LST.PCA.1                    7.8373     1.5295   5.124 2.99e-07 ***
+LST.PCA.3                   -0.5501     0.3370  -1.633  0.10255    
+Topo.PCA.3                   1.3252     0.2485   5.332 9.69e-08 ***
+Topo.PCA.4                  -0.4603     0.1640  -2.807  0.00500 ** 
+I(LST.PCA.1^2)              -2.3596     0.5059  -4.664 3.10e-06 ***
+I(Topo.PCA.2^2)              0.2284     0.1536   1.487  0.13695    
+I(Topo.PCA.3^2)             -0.6422     0.2200  -2.919  0.00351 ** 
+I(NDVI.PCA.1^2)             -7.5252     1.4853  -5.066 4.06e-07 ***
+NDVI.PCA.1:LST.PCA.1       -13.7558     2.4402  -5.637 1.73e-08 ***
+NDVI.PCA.1:LST.PCA.3        -4.2737     0.6952  -6.148 7.86e-10 ***
+NDVI.PCA.1:Topo.PCA.3       -1.9867     0.2994  -6.635 3.25e-11 ***
+NDVI.PCA.1:I(LST.PCA.1^2)    2.8865     0.6531   4.420 9.88e-06 ***
+NDVI.PCA.1:I(Topo.PCA.2^2)  -1.0930     0.3458  -3.160  0.00158 ** 
+NDVI.PCA.1:I(Topo.PCA.3^2)   1.2361     0.3402   3.633  0.00028 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 1354.7  on 184  degrees of freedom
+Residual deviance:  154.3  on 169  degrees of freedom
+AIC: 295.09
+
+Number of Fisher Scoring iterations: 6
+

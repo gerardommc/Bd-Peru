@@ -1,0 +1,42 @@
+Geostatistical binomial model 
+Call: 
+binomial.logistic.MCML(formula = N.positive ~ NDVI.PCA.1 + LST.PCA.1 + 
+    LST.PCA.3 + Topo.PCA.3 + Topo.PCA.4 + I(LST.PCA.1^2) + I(Topo.PCA.2^2) + 
+    I(Topo.PCA.3^2) + I(NDVI.PCA.1^2) + NDVI.PCA.1:LST.PCA.1 + 
+    NDVI.PCA.1:LST.PCA.3 + NDVI.PCA.1:Topo.PCA.3 + NDVI.PCA.1:I(LST.PCA.1^2) + 
+    NDVI.PCA.1:I(Topo.PCA.2^2) + NDVI.PCA.1:I(Topo.PCA.3^2), 
+    units.m = ~N.sampled, coords = ~x + y, data = data, par0 = params, 
+    control.mcmc = mcmc.1, kappa = 0.5, start.cov.pars = start.1)
+
+                            Estimate    StdErr z.value   p.value    
+(Intercept)                 -9.86893   1.04574 -9.4373 < 2.2e-16 ***
+NDVI.PCA.1                  11.10633   2.28098  4.8691 1.121e-06 ***
+LST.PCA.1                    7.41528   1.50150  4.9386 7.870e-07 ***
+LST.PCA.3                   -0.34481   0.52280 -0.6595 0.5095452    
+Topo.PCA.3                   1.58579   0.41197  3.8493 0.0001184 ***
+Topo.PCA.4                  -0.65039   0.21878 -2.9728 0.0029512 ** 
+I(LST.PCA.1^2)              -2.01651   0.66097 -3.0508 0.0022820 ** 
+I(Topo.PCA.2^2)              0.16658   0.12051  1.3823 0.1668913    
+I(Topo.PCA.3^2)             -0.60997   0.36152 -1.6872 0.0915553 .  
+I(NDVI.PCA.1^2)             -7.56001   1.75711 -4.3025 1.689e-05 ***
+NDVI.PCA.1:LST.PCA.1       -14.47967   2.43660 -5.9426 2.806e-09 ***
+NDVI.PCA.1:LST.PCA.3        -4.27466   0.90310 -4.7333 2.209e-06 ***
+NDVI.PCA.1:Topo.PCA.3       -2.46536   0.58842 -4.1898 2.792e-05 ***
+NDVI.PCA.1:I(LST.PCA.1^2)    2.91351   0.74383  3.9169 8.970e-05 ***
+NDVI.PCA.1:I(Topo.PCA.2^2)  -1.05297   0.18233 -5.7751 7.691e-09 ***
+NDVI.PCA.1:I(Topo.PCA.3^2)   1.06828   0.62485  1.7096 0.0873318 .  
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Objective function: 20.79671
+ 
+Covariance parameters Matern function (kappa=0.5) 
+             Estimate StdErr
+log(sigma^2)  0.64833 0.2557
+log(phi)      0.39074 1.3420
+log(tau^2)    0.32929 0.7070
+
+Legend: 
+sigma^2 = variance of the Gaussian process 
+phi = scale of the spatial correlation 
+tau^2 = variance of the nugget effect 

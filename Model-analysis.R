@@ -22,12 +22,33 @@ library(ggplot2)
 
 library(viridis)
 
-ggplot(model.data.df) + geom_hex(aes(x = Prevalence, y = Suitability, fill = after_stat(log10(count))), stat = "binhex") +
-    geom_smooth(aes(x = Prevalence, y = Suitability), colour = "red")
+ggplot(model.data.df) + geom_hex(aes(x = Suitability, y = Prevalence, fill = after_stat(log10(count))), stat = "binhex") +
+    geom_smooth(aes(x = Suitability, y = Prevalence), colour = "red") +
+    scale_fill_gradientn(colours = viridis(100)) +
+    labs(fill = expression(log[10] (count)))
 ggplot(model.data.df) + geom_hex(aes(x = Prevalence, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
-    geom_smooth(aes(x = Prevalence, y = Richness), colour = "red")
-ggplot(model.data.df) + geom_hex(aes(x = Richness, y = Suitability, fill = after_stat(log10(count))), stat = "binhex")+
-    geom_smooth(aes(x = Richness, y = Suitability), colour = "red")
+    geom_smooth(aes(x = Prevalence, y = Richness), colour = "red")+
+    scale_fill_gradientn(colours = viridis(100))+
+    labs(fill = expression(log[10] (count)))
+ggplot(model.data.df) + geom_hex(aes(x = Suitability, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
+    geom_smooth(aes(x = Suitability, y = Richness), colour = "red")+
+    scale_fill_gradientn(colours = viridis(100))+
+    labs(fill = expression(log[10] (count)))
+
+pdf("Correlations.pdf", width = 6, height = 5)
+ggplot(model.data.df) + geom_hex(aes(x = Suitability, y = Prevalence, fill = after_stat(log10(count))), stat = "binhex") +
+    geom_smooth(aes(x = Suitability, y = Prevalence), colour = "red") +
+    scale_fill_gradientn(colours = viridis(100)) +
+    labs(fill = expression(log[10] (count)))
+ggplot(model.data.df) + geom_hex(aes(x = Prevalence, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
+    geom_smooth(aes(x = Prevalence, y = Richness), colour = "red")+
+    scale_fill_gradientn(colours = viridis(100))+
+    labs(fill = expression(log[10] (count)))
+ggplot(model.data.df) + geom_hex(aes(x = Suitability, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
+    geom_smooth(aes(x = Suitability, y = Richness), colour = "red")+
+    scale_fill_gradientn(colours = viridis(100))+
+    labs(fill = expression(log[10] (count)))
+dev.off()
 
 # NPAs
 
@@ -54,10 +75,20 @@ names(model.spp.mean) <- paste0(names(model.spp.mean), ".mean")
 names(model.spp.max) <- paste0(names(model.spp.max), ".max")
 names(model.spp.sd) <- paste0(names(model.spp.sd), ".sd")
 
+library(sf); library(tidyverse)
+
+spp2 <- st_read("Anuran-species/Peru-Anurans.shp")
+
+areas <- st_area(spp2)
+
 spp.model <- cbind(spp, model.spp.mean,
                    model.spp.max, model.spp.sd)
+spp.model$Area <- as.numeric(areas/1e+6)
 
-names(spp.model)
+cents <- centroids(spp, inside = T)
+cents$Area <- as.numeric(areas/1e+6)
+
+writeVector(cents, "Anuran-species/Centroid-distributions.shp", overwrite = T)
 
 spp.mod.df <- spp.model |> as.data.frame()
 
@@ -74,9 +105,162 @@ for(i in 1:nrow(spp.mod.df)){
     }
 }
 
+NAs <- is.na(spp.mod.df$Status)
+spp.mod.df$Status[NAs] <- "No information"
+
+st <- factor(spp.mod.df$Status)
+
+st <- ordered(st, c("Least Concern", "No information", "Data Deficient", "Near Threatened",
+                    "Vulnerable", "Endangered", "Critically Endangered"))
+spp.mod.df$Status <- st
+
+spp.mod.df <- na.omit(spp.mod.df)
+
 library(ggplot2)
 
-ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = prevalence.mean))
-ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = `DNC-175.mean`))
+pdf("Suit-prev-conservation.pdf", width = 6, height = 5)
+ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = prevalence.mean)) +
+    labs(y = "Prevalence", x = "IUCN Category") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = log10(Area))) +
+    labs(y = expression(log[10](Area)), x = "IUCN Category") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = `DNC-175.mean`)) +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) +
+    labs(y = "Suitability", x = "IUCN Category") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+dev.off()
 
+spp.mod.df$OR <- with(spp.mod.df, (prevalence.mean+0.01)/(1 - (prevalence.mean + 0.01)))
 
+pdf("Prev-Area-Status.pdf", width = 7, height = 5)
+ggplot(spp.mod.df) + geom_point(aes(x = log((prevalence.mean+0.01)/(1-(prevalence.mean+0.01))),
+                                    y = log10(Area), colour = Status, size = prevalence.sd), 
+                                alpha = 0.5) +
+    stat_ellipse(aes(x = log(prevalence.mean/(1-prevalence.mean)), y = log10(Area), colour = Status)) +
+    labs(x = "log(Odds ratio)", y = expression(log[10](Area)), 
+         size = "Prevalence S. D.", colour = "IUCN status") +
+    theme_bw()
+
+ggplot(spp.mod.df) + geom_point(aes(x = `DNC-175.mean`,
+                                    y = log10(Area), colour = Status, size = prevalence.sd), 
+                                alpha = 0.5) +
+    stat_ellipse(aes(x = `DNC-175.mean`, y = log10(Area), colour = Status)) +
+    labs(x = "Suitability", y = expression(log[10](Area)), 
+         size = "Prevalence S. D.", colour = "IUCN status") +
+    theme_bw()
+
+ggplot(spp.mod.df) + geom_point(aes(x = `DNC-175.mean`,
+                                    y = log(OR), colour = Status, size = prevalence.sd), 
+                                alpha = 0.5) +
+    stat_ellipse(aes(x = `DNC-175.mean`, y = log(OR), colour = Status)) +
+    labs(x = "Suitability", y = "log(Odds ratio)", 
+         size = "Prevalence S. D.", colour = "IUCN status") +
+    theme_bw()
+dev.off()
+
+#Ternary plot
+
+library(ggtern); library(tidyverse)
+
+spp.mod.t <- data.frame(Status = spp.mod.df$Status)
+spp.mod.t$Status <- ordered(spp.mod.t$Status, c("Critically Endangered", "Endangered", "Vulnerable", 
+                            "Near Threatened", "Data Deficient",       
+                            "No information", "Least Concern"))
+
+reg <- function(x){(x - min(x))/(max(x) - min(x))}
+
+spp.mod.t$OR <- log(spp.mod.df$OR) |> reg()
+spp.mod.t$Suitability <- log(spp.mod.df$`DNC-175.mean`) |> reg()
+spp.mod.t$Area <- log10(spp.mod.df$Area) |> reg()
+
+spp.mod.t$Prev.sd <- spp.mod.df$prevalence.sd
+
+breaks.L <- with(spp.mod.df, seq(min(log(OR)), max(log(OR)), len = 6)) 
+breaks.R <- with(spp.mod.df, seq(min(log(Area)), max(log(Area)), len = 6)) 
+breaks.T <- with(spp.mod.df, seq(min(log(`DNC-175.mean`)), max(log(`DNC-175.mean`)), len = 6)) 
+
+breaks.L <- round(breaks.L, 1)
+breaks.R <- round(breaks.R, 1)
+breaks.T <- round(breaks.T, 1)
+
+pdf("Ternary-plot.pdf", width = 7, height = 6)
+ggtern(spp.mod.t, aes(x = OR, y = Suitability, z = Area)) +
+    geom_point(aes(colour = Status, size = Prev.sd), alpha = 0.4) +
+    theme_showarrows() +
+    theme_showgrid_minor() +
+    labs(x = "log(Odds ratio)",
+         y = "log(Suitability)",
+         z = "log(Area)") +
+    scale_L_continuous(labels = breaks.L) +
+    scale_T_continuous(labels = breaks.T) +
+    scale_R_continuous(labels = breaks.R)
+dev.off()
+
+## Models for the analysis
+
+mod <- lm(log(Area) ~ Status + log(OR):Status, data = spp.mod.df)
+
+summary(mod)
+
+dir.create("Results")
+sink("Results/Model-Area-prevalence-status.txt", type = "output")
+summary(mod)
+sink()
+
+#Model with suitability
+
+mod.suit <- lm(log(Area) ~ Status + `DNC-175.mean`:Status, data = spp.mod.df)
+
+summary(mod.suit)
+
+sink("Results/Model-Area-Suitability-status.txt", type = "output")
+summary(mod.suit)
+sink()
+
+pdf("Results/Lin-mod-diag-suit.pdf", width = 5, height = 5)
+plot(mod.suit)
+dev.off()
+
+spp.mod.df$Status.num <- as.numeric(spp.mod.df$Status)
+
+spp.mod.df$Suitability <- spp.mod.df$`DNC-175.mean`
+
+library(mgcv)
+mod.status <- gam(Status.num ~ s(log(OR)) + s(log(Area)) + s(log(Suitability)), data = spp.mod.df)
+
+sink("Results/Lin-mod-status.txt", type = "output")
+summary(mod.status)
+sink()
+
+pdf("Results/Lin-mod-diag-Status.pdf", width = 5, height = 5)
+plot(mod.status)
+dev.off()
+
+pdf("Status-cor-prev-suit-area.pdf", width = 7, height = 5)
+ggplot(spp.mod.df) + geom_boxplot(aes(x = log(OR), y = Status), alpha = 0.5, outlier.size = 0) +
+    labs(x = "log(Odds ratio)", y = "IUCN status", size = "EOO \nsize") +
+    geom_point(aes(x = log(OR), y = Status, size = Area), alpha = 0.2) +
+    geom_smooth(aes(x = log(OR), y = Status.num), method = "gam", colour = "darkgrey") +
+    theme_bw()
+ggplot(spp.mod.df) + geom_boxplot(aes(x = log(`DNC-175.mean`), y = Status), alpha = 0.5, outlier.size = 0) +
+    labs(x = "log(Suitability)", y = "IUCN status", size = "EOO \nsize") +
+    geom_point(aes(x = log(`DNC-175.mean`), y = Status, size = Area), alpha = 0.2) +
+    geom_smooth(aes(x = log(`DNC-175.mean`), y = Status.num), method = "gam", colour = "darkgrey") +
+    theme_bw()
+ggplot(spp.mod.df) + geom_bar(aes(x = Status), alpha = 0.5) +
+    labs(x = "IUCN status", y = "No. of species") +
+    theme_bw() +
+    theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+dev.off()
+
+prev.mod <- readRDS("Model-results/Bd-GeoStat-Prevalence.rds")
+
+library(PrevMap)
+
+sink("Model-results/Prev-model-summary.txt")
+summary(prev.mod)
+sink()

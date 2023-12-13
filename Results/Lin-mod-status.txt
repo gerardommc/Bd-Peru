@@ -1,0 +1,23 @@
+
+Family: gaussian 
+Link function: identity 
+
+Formula:
+Status.num ~ 1 + s(log(OR)) + s(log(Area)) + s(log(Suitability))
+
+Parametric coefficients:
+            Estimate Std. Error t value Pr(>|t|)    
+(Intercept)  2.57778    0.07209   35.76   <2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+Approximate significance of smooth terms:
+                      edf Ref.df      F p-value    
+s(log(OR))          5.911  7.102  3.186 0.00249 ** 
+s(log(Area))        3.047  3.769 35.087 < 2e-16 ***
+s(log(Suitability)) 5.390  6.552  8.104 < 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+R-sq.(adj) =  0.383   Deviance explained = 40.1%
+GCV =  2.655  Scale est. = 2.5727    n = 495

@@ -176,7 +176,7 @@ preds.r.logit <- exp(preds.r)/(1+exp(preds.r))
 plot(preds.r.logit)
 points(all.reg.gam[, c("x", "y")])
 
-writeRaster(prevalence, "Prevalence-maps/Prevalence-median-GLM.tif", overwrite = T)
+writeRaster(preds.r.logit, "Prevalence-maps/Prevalence-median-GLM.tif", overwrite = T)
 
 ################ Prevmap model
 
@@ -185,15 +185,16 @@ library(geoR)
 
 vari <- variog(coords=xy,data=bd.dat.psad$logit.prev, angles = F)
 
-plot(vari,xlab="distance (decimal degrees)")
+plot(vari,xlab="distance (metres)")
 
 vari.fit <- variofit(vari,ini.cov.pars=c(0.1,0.5),cov.model="matern",
-                     fix.nugget=FALSE,nugget=5,
+                     fix.nugget=FALSE,nugget=3,
                      fix.kappa=FALSE,kappa=0.1,
                      minimisation.function = "nlm")
 lines(vari.fit)
 
 vari.fit
+summary(vari.fit)
 
 # Fitting geostatistical model
 library(PrevMap)
@@ -251,8 +252,27 @@ exceed <- rast(data.frame(grid.pred, pred.MCML$exceedance.prob))
 dir.create("Prevalence-maps")
 
 #writing up results
-writeRaster(prevalence, "Prevalence-maps/Prevalence-median-GeoStat.tif")
-for(i in 1:5)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "19", "50" , "69", "975")[i], ".tif"))
+writeRaster(prevalence, "Prevalence-maps/Prevalence-median-GeoStat.tif", overwrite = T)
+for(i in 1:5)writeRaster(exceed[[i]], paste0("Prevalence-maps/Exceedence-prob-", c("025", "19", "50" , "69", "975")[i], ".tif"), 
+                         overwrite = T)
 
 dir.create("Model-results")
 saveRDS(fit.MCML.1, "Model-results/Bd-GeoStat-Prevalence.rds")
+
+sink("Model-results/GeoStat-model.txt")
+fit.MCML.1
+sink()
+
+##### Final GLM model
+
+m.fin <- glm(cbind(N.positive, N.sampled - N.positive) ~ NDVI.PCA.1 + LST.PCA.1 + 
+                           LST.PCA.3 + Topo.PCA.3 + Topo.PCA.4 + I(LST.PCA.1^2) + I(Topo.PCA.2^2) + 
+                           I(Topo.PCA.3^2) + I(NDVI.PCA.1^2) + NDVI.PCA.1:LST.PCA.1 + 
+                           NDVI.PCA.1:LST.PCA.3 + NDVI.PCA.1:Topo.PCA.3 + NDVI.PCA.1:I(LST.PCA.1^2) + 
+                           NDVI.PCA.1:I(Topo.PCA.2^2) + NDVI.PCA.1:I(Topo.PCA.3^2), 
+                       all.reg,
+                       family = binomial)
+
+sink("Model-results/Bin-model-final.txt", type = "output")
+summary(m.fin)
+sink()
