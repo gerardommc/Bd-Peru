@@ -202,44 +202,52 @@ dev.off()
 
 ## Models for the analysis
 
-mod <- lm(log(Area) ~ Status + log(OR):Status, data = spp.mod.df)
+library(tidymodels)
 
-summary(mod)
+spp.mod.analysis <- data.frame(Status = spp.mod.df$Status,
+                               OR = log(spp.mod.df$OR),
+                               Area = log(spp.mod.df$Area),
+                               Suitability = log(spp.mod.df$`DNC-175.mean`))
+stand <- function(x) {(x - mean(x))/sd(x)}
 
-dir.create("Results")
-sink("Results/Model-Area-prevalence-status.txt", type = "output")
-summary(mod)
+spp.mod.analysis$OR <- spp.mod.analysis$OR |> stand()
+spp.mod.analysis$Suitability <- spp.mod.analysis$Suitability |> stand()
+spp.mod.analysis$Area <- spp.mod.analysis$Area |> stand()
+
+mod.1 <- multinom_reg() |> fit(Status ~ 0 + OR + Suitability + Area, spp.mod.analysis)
+
+sink("Results/Multinomial-model.txt", type = "output")
+tidy(mod.1, exponentiate = TRUE, conf.int = TRUE) |> 
+    mutate_if(is.numeric, round, 4) |> 
+    select(-std.error, -statistic)
 sink()
 
-#Model with suitability
+sink("Results/Multinomial-model-performance.txt", type = "output")
+Predictions <- mod.1 |> 
+    augment(new_data = spp.mod.analysis)
 
-mod.suit <- lm(log(Area) ~ Status + `DNC-175.mean`:Status, data = spp.mod.df)
+conf_mat(Predictions, truth = Status, estimate = .pred_class)
 
-summary(mod.suit)
+accuracy(Predictions, truth = Status, estimate = .pred_class)
 
-sink("Results/Model-Area-Suitability-status.txt", type = "output")
-summary(mod.suit)
+roc_auc(Predictions, truth = Status, `.pred_Least Concern`, `.pred_No information`,
+        `.pred_Data Deficient`, `.pred_Near Threatened`,
+        .pred_Vulnerable, .pred_Endangered, `.pred_Critically Endangered`)
 sink()
 
-pdf("Results/Lin-mod-diag-suit.pdf", width = 5, height = 5)
-plot(mod.suit)
+pdf("Results/Multinom-performance.pdf", width = 6, height = 5)
+roc_curve(Predictions, truth = Status, `.pred_Least Concern`, `.pred_No information`,
+          `.pred_Data Deficient`, `.pred_Near Threatened`,
+          .pred_Vulnerable, .pred_Endangered, `.pred_Critically Endangered`) |> 
+    ggplot(aes(x = 1 - specificity, y = sensitivity, color = .level)) +
+    geom_line(size = 1, alpha = 0.7) +
+    geom_abline(slope = 1, linetype = "dotted") +
+    coord_fixed() +
+    labs(color = NULL) +
+    theme_light()
 dev.off()
 
-spp.mod.df$Status.num <- as.numeric(spp.mod.df$Status)
-
-spp.mod.df$Suitability <- spp.mod.df$`DNC-175.mean`
-
-library(mgcv)
-mod.status <- gam(Status.num ~ s(log(OR)) + s(log(Area)) + s(log(Suitability)), data = spp.mod.df)
-
-sink("Results/Lin-mod-status.txt", type = "output")
-summary(mod.status)
-sink()
-
-pdf("Results/Lin-mod-diag-Status.pdf", width = 5, height = 5)
-plot(mod.status)
-dev.off()
-
+##
 pdf("Status-cor-prev-suit-area.pdf", width = 7, height = 5)
 ggplot(spp.mod.df) + geom_boxplot(aes(x = log(OR), y = Status), alpha = 0.5, outlier.size = 0) +
     labs(x = "log(Odds ratio)", y = "IUCN status", size = "EOO \nsize") +
