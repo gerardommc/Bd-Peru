@@ -1,4 +1,5 @@
 library(terra)
+library(tidyverse)
 
 prev <- rast("Prevalence-maps/Prevalence-median-GeoStat.tif")
 suit <- rast("Bd-Suitability/DNC-175.tif")
@@ -30,8 +31,8 @@ ggplot(model.data.df) + geom_hex(aes(x = Prevalence, y = Richness, fill = after_
     geom_smooth(aes(x = Prevalence, y = Richness), colour = "red")+
     scale_fill_gradientn(colours = viridis(100))+
     labs(fill = expression(log[10] (count)))
-ggplot(model.data.df) + geom_hex(aes(x = Suitability, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
-    geom_smooth(aes(x = Suitability, y = Richness), colour = "red")+
+ggplot() + geom_hex(data = model.data.df, aes(x = Suitability, y = Richness, fill = after_stat(log10(count))), stat = "binhex")+
+    geom_smooth(data = model.data.df[sample(1:10558, 1000), ], aes(x = Suitability, y = Richness), colour = "red", method = "loess")+
     scale_fill_gradientn(colours = viridis(100))+
     labs(fill = expression(log[10] (count)))
 
@@ -56,7 +57,7 @@ npas <- vect("Protected-areas/Peru-NPAs.gpkg")
 
 npas <- project(npas, crs(prev))
 
-model.npas <- extract(model.data, npas, fun = "mean", na.rm = T)
+model.npas <- terra::extract(model.data, npas, fun = "mean", na.rm = T)
 
 npas <- cbind(npas, model.npas)
 
@@ -67,9 +68,9 @@ writeVector(npas,"Protected-areas/Peru-NPAs-BD-data.gpkg")
 spp <- vect("Anuran-species/Peru-Anurans.shp")
 spp <- project(spp, crs("EPSG:24892"))
 
-model.spp.mean <- extract(model.data, spp, fun = "mean", na.rm = T)[, -1]
-model.spp.max <- extract(model.data, spp, fun = "max", na.rm = T)[, -1]
-model.spp.sd <- extract(model.data, spp, fun = "sd", na.rm = T)[, -1]
+model.spp.mean <- terra::extract(model.data, spp, fun = "mean", na.rm = T)[, -1]
+model.spp.max <- terra::extract(model.data, spp, fun = "max", na.rm = T)[, -1]
+model.spp.sd <- terra::extract(model.data, spp, fun = "sd", na.rm = T)[, -1]
 
 names(model.spp.mean) <- paste0(names(model.spp.mean), ".mean")
 names(model.spp.max) <- paste0(names(model.spp.max), ".max")
@@ -77,7 +78,7 @@ names(model.spp.sd) <- paste0(names(model.spp.sd), ".sd")
 
 library(sf); library(tidyverse)
 
-spp2 <- st_read("Anuran-species/Peru-Anurans.shp")
+spp2 <- st_read("Anuran-species/Anurans-IUCN/data_0.shp")
 
 areas <- st_area(spp2)
 
@@ -85,8 +86,10 @@ spp.model <- cbind(spp, model.spp.mean,
                    model.spp.max, model.spp.sd)
 spp.model$Area <- as.numeric(areas/1e+6)
 
-cents <- centroids(spp, inside = T)
-cents$Area <- as.numeric(areas/1e+6)
+spp3 <- vect("Anuran-species/Anurans-IUCN/data_0.shp")
+
+cents <- centroids(spp3, inside = T)
+cents$Area <- round(as.numeric(areas/1e+6), 3)
 
 writeVector(cents, "Anuran-species/Centroid-distributions.shp", overwrite = T)
 
@@ -134,6 +137,24 @@ ggplot(spp.mod.df) + geom_boxplot(aes(x = Status, y = `DNC-175.mean`)) +
     theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
 dev.off()
 
+spp.model$Status <- spp.mod.df$Status
+
+library(plyr)
+
+spp.model$Status <- revalue(spp.model$Status, c("Least Concern" = "LC",
+                                                "No information" = "NI",
+                                                "Data Deficient" = "DD",
+                                                "Near Threatened" = "NT",
+                                                "Vulnerable" = "Vu",
+                                                "Endangered" = "En",
+                                                "Critically Endangered" = "CE"))
+
+# Polygons for different status
+dir.create("Anuran-species/By-status")
+for(i in seq_along(levels(spp.model$Status))){writeVector(spp.model, paste0("Anuran-species/By-status/",
+                                                            levels(spp.model$Status)[i], ".shp"),
+                                               overwrite = T)}
+ 
 spp.mod.df$OR <- with(spp.mod.df, (prevalence.mean+0.01)/(1 - (prevalence.mean + 0.01)))
 
 pdf("Prev-Area-Status.pdf", width = 7, height = 5)
@@ -187,14 +208,20 @@ breaks.L <- round(breaks.L, 1)
 breaks.R <- round(breaks.R, 1)
 breaks.T <- round(breaks.T, 1)
 
+library(RColorBrewer)
+
 pdf("Ternary-plot.pdf", width = 7, height = 6)
 ggtern(spp.mod.t, aes(x = OR, y = Suitability, z = Area)) +
-    geom_point(aes(colour = Status, size = Prev.sd), alpha = 0.4) +
+    geom_point(aes(colour = Status, size = Prev.sd), alpha = 0.3) +
+    scale_colour_brewer(palette = "Set1") + 
+    geom_confidence_tern(aes(colour = Status), breaks = 0.5, alpha = 0.8) +
     theme_showarrows() +
     theme_showgrid_minor() +
     labs(x = "log(Odds ratio)",
          y = "log(Suitability)",
-         z = "log(Area)") +
+         z = "log(Area)",
+         size = "Prevalence\n S. D.",
+         colour = "IUCN \n status") +
     scale_L_continuous(labels = breaks.L) +
     scale_T_continuous(labels = breaks.T) +
     scale_R_continuous(labels = breaks.R)
@@ -210,11 +237,14 @@ spp.mod.analysis <- data.frame(Status = spp.mod.df$Status,
                                Suitability = log(spp.mod.df$`DNC-175.mean`))
 stand <- function(x) {(x - mean(x))/sd(x)}
 
+spp.mod.analysis$Status <- ordered(spp.mod.analysis$Status, c("Critically Endangered", "Endangered", "Vulnerable", "Near Threatened",
+                                                    "Data Deficient", "No information", "Least Concern"))
+
 spp.mod.analysis$OR <- spp.mod.analysis$OR |> stand()
 spp.mod.analysis$Suitability <- spp.mod.analysis$Suitability |> stand()
 spp.mod.analysis$Area <- spp.mod.analysis$Area |> stand()
 
-mod.1 <- multinom_reg() |> fit(Status ~ 0 + OR + Suitability + Area, spp.mod.analysis)
+mod.1 <- multinom_reg() |> fit(Status ~ OR + Suitability + Area , spp.mod.analysis)
 
 sink("Results/Multinomial-model.txt", type = "output")
 tidy(mod.1, exponentiate = TRUE, conf.int = TRUE) |> 
@@ -235,16 +265,20 @@ roc_auc(Predictions, truth = Status, `.pred_Least Concern`, `.pred_No informatio
         .pred_Vulnerable, .pred_Endangered, `.pred_Critically Endangered`)
 sink()
 
+Predictions$Status <- ordered(Predictions$Status, c("Critically Endangered", "Endangered", "Vulnerable", "Near Threatened",
+                                                    "Data Deficient", "No information", "Least Concern"))
+
 pdf("Results/Multinom-performance.pdf", width = 6, height = 5)
 roc_curve(Predictions, truth = Status, `.pred_Least Concern`, `.pred_No information`,
           `.pred_Data Deficient`, `.pred_Near Threatened`,
           .pred_Vulnerable, .pred_Endangered, `.pred_Critically Endangered`) |> 
     ggplot(aes(x = 1 - specificity, y = sensitivity, color = .level)) +
-    geom_line(size = 1, alpha = 0.7) +
-    geom_abline(slope = 1, linetype = "dotted") +
+    geom_line(size = 1, alpha = 0.6) +
+    geom_abline(slope = 1, linetype = "dotted") + 
+    scale_colour_brewer(palette = "Set1") +
     coord_fixed() +
     labs(color = NULL) +
-    theme_light()
+    theme_grey()
 dev.off()
 
 ##

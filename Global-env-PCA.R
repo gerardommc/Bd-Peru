@@ -32,6 +32,15 @@ pca <- princomp(samples.scale)
 
 saveRDS(pca, "Environment-raster/Chelsa-PCA-results.rds")
 
+pdf("Environment-raster/Biplots-PCA.pdf", width = 6, height = 6)
+biplot(pca, choices = c(2, 7))
+biplot(pca, choices = c(2, 8))
+biplot(pca, choices = c(2, 9))
+biplot(pca, choices = c(7, 8))
+biplot(pca, choices = c(7, 9))
+biplot(pca, choices = c(8, 9))
+dev.off()
+
 rm(chelsa); gc(reset = T)
 
 chels.pca <- predict(chels.scale, pca, index = 1:10)
